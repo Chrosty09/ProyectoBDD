@@ -1,15 +1,23 @@
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from "../context/AuthContext";
 
 const ROLES = {
-  admin:   'Administrador',
-  gerente: 'Gerente',
-  cajero:  'Cajero',
+  admin: "Administrador",
+  gerente: "Gerente",
+  cajero: "Cajero",
 };
 
 const SUCURSALES = {
-  0: 'Corporativo', 1: 'AGS Centro', 2: 'AGS Norte', 3: 'GDL Centro',
-  4: 'Zapopan', 5: 'CDMX Condesa', 6: 'CDMX Polanco', 7: 'MTY Centro',
-  8: 'MTY San Pedro', 9: 'Puebla', 10: 'Leon',
+  0: "Corporativo",
+  1: "AGS Centro",
+  2: "AGS Norte",
+  3: "GDL Centro",
+  4: "Zapopan",
+  5: "CDMX Condesa",
+  6: "CDMX Polanco",
+  7: "MTY Centro",
+  8: "MTY San Pedro",
+  9: "Puebla",
+  10: "Leon",
 };
 
 export default function Navbar({ pagina, setPagina }) {
@@ -21,18 +29,22 @@ export default function Navbar({ pagina, setPagina }) {
         <span className="font-black text-xl tracking-tight">QuickMart</span>
         <div className="flex gap-1">
           <button
-            onClick={() => setPagina('ventas')}
+            onClick={() => setPagina("ventas")}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              pagina === 'ventas' ? 'bg-white text-blue-900' : 'hover:bg-blue-800'
+              pagina === "ventas"
+                ? "bg-white text-blue-900"
+                : "hover:bg-blue-800"
             }`}
           >
             Punto de Venta
           </button>
-          {usuario?.rol !== 'cajero' && (
+          {usuario?.rol !== "cajero" && (
             <button
-              onClick={() => setPagina('reportes')}
+              onClick={() => setPagina("reportes")}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                pagina === 'reportes' ? 'bg-white text-blue-900' : 'hover:bg-blue-800'
+                pagina === "reportes"
+                  ? "bg-white text-blue-900"
+                  : "hover:bg-blue-800"
               }`}
             >
               Reportes

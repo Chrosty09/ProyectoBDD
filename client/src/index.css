@@ -1,1 +1,41 @@
 @import "tailwindcss";
+
+@theme {
+  --color-navy:   #1B3C53;
+  --color-slate:  #456882;
+  --color-sand:   #D2C1B6;
+  --color-cream:  #F9F3EF;
+  --color-muted:  #8a9eb0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background-color: #F9F3EF;
+  color: #1B3C53;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: 'Sora', sans-serif;
+}
+
+/* Scrollbar sutil */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #F9F3EF; }
+::-webkit-scrollbar-thumb { background: #D2C1B6; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #456882; }
+
+/* Animacion de entrada de cards */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.35s ease both; }
+.fade-up-1 { animation-delay: 0.05s; }
+.fade-up-2 { animation-delay: 0.1s; }
+.fade-up-3 { animation-delay: 0.15s; }
+.fade-up-4 { animation-delay: 0.2s; }
