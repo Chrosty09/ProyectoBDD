@@ -13,7 +13,7 @@ const inventarioSchema = require("../models/Inventario");
 const SUCURSALES = [
   {
     sucursalId: 1,
-    nombre: "OXXO Aguascalientes Centro",
+    nombre: "QuickMart Aguascalientes Centro",
     ciudad: "Aguascalientes",
     region: "Centro",
     direccion: "Av. Lopez Mateos 100, Centro",
@@ -21,7 +21,7 @@ const SUCURSALES = [
   },
   {
     sucursalId: 2,
-    nombre: "OXXO Aguascalientes Norte",
+    nombre: "QuickMart Aguascalientes Norte",
     ciudad: "Aguascalientes",
     region: "Norte",
     direccion: "Blvd. Luis Donaldo Colosio 45, Norte",
@@ -29,7 +29,7 @@ const SUCURSALES = [
   },
   {
     sucursalId: 3,
-    nombre: "OXXO Guadalajara Centro",
+    nombre: "QuickMart Guadalajara Centro",
     ciudad: "Guadalajara",
     region: "Centro",
     direccion: "Av. Juarez 300, Centro Historico",
@@ -37,7 +37,7 @@ const SUCURSALES = [
   },
   {
     sucursalId: 4,
-    nombre: "OXXO Zapopan",
+    nombre: "QuickMart Zapopan",
     ciudad: "Guadalajara",
     region: "Zapopan",
     direccion: "Av. Vallarta 1200, Zapopan",
@@ -45,7 +45,7 @@ const SUCURSALES = [
   },
   {
     sucursalId: 5,
-    nombre: "OXXO CDMX Condesa",
+    nombre: "QuickMart CDMX Condesa",
     ciudad: "CDMX",
     region: "Condesa",
     direccion: "Av. Amsterdam 55, Condesa",
@@ -53,7 +53,7 @@ const SUCURSALES = [
   },
   {
     sucursalId: 6,
-    nombre: "OXXO CDMX Polanco",
+    nombre: "QuickMart CDMX Polanco",
     ciudad: "CDMX",
     region: "Polanco",
     direccion: "Presidente Masaryk 400, Polanco",
@@ -61,7 +61,7 @@ const SUCURSALES = [
   },
   {
     sucursalId: 7,
-    nombre: "OXXO Monterrey Centro",
+    nombre: "QuickMart Monterrey Centro",
     ciudad: "Monterrey",
     region: "Centro",
     direccion: "Av. Constitucion 10, Centro",
@@ -69,7 +69,7 @@ const SUCURSALES = [
   },
   {
     sucursalId: 8,
-    nombre: "OXXO Monterrey San Pedro",
+    nombre: "QuickMart Monterrey San Pedro",
     ciudad: "Monterrey",
     region: "San Pedro",
     direccion: "Av. Vasconcelos 210, San Pedro",
@@ -77,7 +77,7 @@ const SUCURSALES = [
   },
   {
     sucursalId: 9,
-    nombre: "OXXO Puebla Centro",
+    nombre: "QuickMart Puebla Centro",
     ciudad: "Puebla",
     region: "Centro",
     direccion: "4 Sur 100, Centro Historico",
@@ -85,7 +85,7 @@ const SUCURSALES = [
   },
   {
     sucursalId: 10,
-    nombre: "OXXO Leon",
+    nombre: "QuickMart Leon",
     ciudad: "Leon",
     region: "Guanajuato",
     direccion: "Blvd. Lopez Mateos 800, Leon",
@@ -93,7 +93,7 @@ const SUCURSALES = [
   },
 ];
 
-// ─── Catalogo de productos tipo OXXO ───────────────────────────────────────
+// ─── Catalogo de productos tipo QuickMart ───────────────────────────────────────
 const CATEGORIAS = [
   {
     cat: "Bebidas",
@@ -240,7 +240,7 @@ const CATEGORIAS = [
       "Pago CFE",
       "Pago TELMEX",
       "Pago Izzi",
-      "Recarga OXXO Pay 100",
+      "Recarga QuickMart Pay 100",
       "Bono Xbox 200",
       "Tarjeta Google Play 100",
     ],
@@ -324,7 +324,7 @@ async function seedHQ(conn, productos) {
   const adminHash = await bcrypt.hash("admin1234", 10);
   await Usuario.create({
     username: "admin",
-    email: "admin@oxxo.com",
+    email: "admin@quickmart.com",
     passwordHash: adminHash,
     rol: "admin",
     sucursalId: 0,
@@ -354,7 +354,7 @@ async function seedSucursal(conn, sucursal, productos) {
 
   const gerente = await Usuario.create({
     username: `gerente_s${String(sucursalId).padStart(2, "0")}`,
-    email: `gerente.s${sucursalId}@oxxo.com`,
+    email: `gerente.s${sucursalId}@quickmart.com`,
     passwordHash: gerenteHash,
     rol: "gerente",
     sucursalId,
@@ -363,7 +363,7 @@ async function seedSucursal(conn, sucursal, productos) {
   const cajeros = await Usuario.insertMany(
     Array.from({ length: 3 }, (_, i) => ({
       username: `cajero${i + 1}_s${String(sucursalId).padStart(2, "0")}`,
-      email: `cajero${i + 1}.s${sucursalId}@oxxo.com`,
+      email: `cajero${i + 1}.s${sucursalId}@quickmart.com`,
       passwordHash: cajeroHash,
       rol: "cajero",
       sucursalId,
