@@ -9,8 +9,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -40,9 +38,6 @@ const CHART_COLORS = [
   "#8fafc4",
   "#c4b0a5",
   "#2d5f7a",
-  "#a89488",
-  "#3d7a9e",
-  "#b8c8d4",
 ];
 
 const card = {
@@ -54,10 +49,7 @@ const card = {
 
 function KpiCard({ label, value, sub, delay = 0 }) {
   return (
-    <div
-      className={`fade-up fade-up-${delay}`}
-      style={{ ...card, display: "flex", flexDirection: "column", gap: "6px" }}
-    >
+    <div className={`fade-up fade-up-${delay}`} style={{ ...card }}>
       <p
         style={{
           fontSize: "11px",
@@ -65,6 +57,7 @@ function KpiCard({ label, value, sub, delay = 0 }) {
           letterSpacing: "1.2px",
           textTransform: "uppercase",
           color: "#8a9eb0",
+          marginBottom: "10px",
         }}
       >
         {label}
@@ -73,14 +66,15 @@ function KpiCard({ label, value, sub, delay = 0 }) {
         style={{
           fontFamily: "Sora, sans-serif",
           fontWeight: 700,
-          fontSize: "28px",
+          fontSize: "26px",
           color: "#1B3C53",
           lineHeight: 1,
+          marginBottom: "6px",
         }}
       >
         {value}
       </p>
-      {sub && <p style={{ fontSize: "12px", color: "#D2C1B6" }}>{sub}</p>}
+      {sub && <p style={{ fontSize: "12px", color: "#b8c5ce" }}>{sub}</p>}
     </div>
   );
 }
@@ -92,18 +86,30 @@ const CustomTooltip = ({ active, payload, label }) => {
       style={{
         background: "#1B3C53",
         borderRadius: "10px",
-        padding: "10px 14px",
+        padding: "10px 16px",
+        boxShadow: "0 8px 24px rgba(27,60,83,0.25)",
         border: "none",
-        boxShadow: "0 8px 24px rgba(27,60,83,0.2)",
       }}
     >
-      <p style={{ color: "#D2C1B6", fontSize: "12px", marginBottom: "4px" }}>
+      <p
+        style={{
+          color: "#D2C1B6",
+          fontSize: "11px",
+          marginBottom: "4px",
+          letterSpacing: "0.5px",
+        }}
+      >
         {label}
       </p>
       {payload.map((p, i) => (
         <p
           key={i}
-          style={{ color: "white", fontSize: "14px", fontWeight: 600 }}
+          style={{
+            color: "white",
+            fontSize: "15px",
+            fontWeight: 700,
+            fontFamily: "Sora, sans-serif",
+          }}
         >
           {typeof p.value === "number" && p.value > 100
             ? `$${p.value.toLocaleString("es-MX", { minimumFractionDigits: 0 })}`
@@ -145,7 +151,6 @@ export default function Reportes() {
         nombre: SUCURSALES_NOMBRES[s.sucursalId] || `S${s.sucursalId}`,
       }));
       setVentasPorSucursal(datos);
-
       const totalGlobal = datos.reduce((a, s) => a + s.totalVentas, 0);
       const numGlobal = datos.reduce((a, s) => a + s.numVentas, 0);
       const ticketGlobal = numGlobal ? totalGlobal / numGlobal : 0;
@@ -173,16 +178,24 @@ export default function Reportes() {
         api.get(`/reportes/productos-top/${id}?limite=7`),
         api.get(`/reportes/metodos-pago/${id}`),
       ]);
-      setVentasPorDia(
-        diasRes.data.datos.map((d) => ({
-          fecha: d._id.slice(5),
-          total: d.totalVentas,
-          ventas: d.numVentas,
-        })),
-      );
+      // Agrupar por semana para que la grafica no quede tan saturada
+      const diasRaw = diasRes.data.datos;
+      const agrupado = [];
+      for (let i = 0; i < diasRaw.length; i += 3) {
+        const chunk = diasRaw.slice(i, i + 3);
+        agrupado.push({
+          fecha: chunk[0]._id.slice(5),
+          total: parseFloat(
+            (
+              chunk.reduce((a, d) => a + d.totalVentas, 0) / chunk.length
+            ).toFixed(2),
+          ),
+        });
+      }
+      setVentasPorDia(agrupado);
       setProductosTop(
         topRes.data.productos.map((p) => ({
-          nombre: p.nombre.slice(0, 18),
+          nombre: p.nombre.slice(0, 20),
           unidades: p.totalUnidades,
         })),
       );
@@ -198,16 +211,19 @@ export default function Reportes() {
     `$${Number(v).toLocaleString("es-MX", { minimumFractionDigits: 0 })}`;
   const sucursalActual =
     SUCURSALES_NOMBRES[sucursalSelec] || `Sucursal ${sucursalSelec}`;
+  const topIdx = ventasPorSucursal.findIndex(
+    (s) => s.nombre === kpis.topSucursal,
+  );
 
   return (
-    <div style={{ maxWidth: "1100px" }}>
+    <div style={{ width: "100%" }}>
       {/* Header */}
       <div
         style={{
-          marginBottom: "32px",
           display: "flex",
-          alignItems: "flex-end",
+          alignItems: "flex-start",
           justifyContent: "space-between",
+          marginBottom: "28px",
         }}
       >
         <div>
@@ -215,25 +231,21 @@ export default function Reportes() {
             style={{
               fontFamily: "Sora, sans-serif",
               fontWeight: 700,
-              fontSize: "26px",
+              fontSize: "24px",
               color: "#1B3C53",
               marginBottom: "4px",
             }}
           >
             Reportes de Ventas
           </h1>
-          <p style={{ fontSize: "14px", color: "#8a9eb0" }}>
+          <p style={{ fontSize: "13px", color: "#8a9eb0" }}>
             Vision general de las {Object.keys(SUCURSALES_NOMBRES).length}{" "}
             sucursales activas
           </p>
         </div>
         {usuario?.rol === "admin" && (
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span
-              style={{ fontSize: "12px", color: "#8a9eb0", fontWeight: 500 }}
-            >
-              Detalle:
-            </span>
+            <span style={{ fontSize: "12px", color: "#8a9eb0" }}>Detalle:</span>
             <select
               style={{
                 borderRadius: "10px",
@@ -265,7 +277,7 @@ export default function Reportes() {
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
           gap: "16px",
-          marginBottom: "24px",
+          marginBottom: "20px",
         }}
       >
         <KpiCard
@@ -294,8 +306,8 @@ export default function Reportes() {
         />
       </div>
 
-      {/* Bar chart — ventas por sucursal */}
-      <div style={{ ...card, marginBottom: "20px" }} className="fade-up">
+      {/* Ingresos por sucursal — ancho completo */}
+      <div style={{ ...card, marginBottom: "20px" }}>
         <p
           style={{
             fontFamily: "Sora, sans-serif",
@@ -324,7 +336,8 @@ export default function Reportes() {
           <ResponsiveContainer width="100%" height={260}>
             <BarChart
               data={ventasPorSucursal}
-              margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
+              margin={{ top: 5, right: 16, left: 10, bottom: 5 }}
+              barCategoryGap="35%"
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -333,30 +346,24 @@ export default function Reportes() {
               />
               <XAxis
                 dataKey="nombre"
-                tick={{ fontSize: 11, fill: "#8a9eb0", fontFamily: "DM Sans" }}
+                tick={{ fontSize: 12, fill: "#8a9eb0", fontFamily: "DM Sans" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tickFormatter={formatPeso}
+                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                 tick={{ fontSize: 11, fill: "#8a9eb0", fontFamily: "DM Sans" }}
                 axisLine={false}
                 tickLine={false}
+                width={52}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={<CustomTooltip />}
+                cursor={{ fill: "#f9f3ef" }}
+              />
               <Bar dataKey="totalVentas" name="Total" radius={[6, 6, 0, 0]}>
                 {ventasPorSucursal.map((_, i) => (
-                  <Cell
-                    key={i}
-                    fill={
-                      i ===
-                      ventasPorSucursal.findIndex(
-                        (s) => s.nombre === kpis.topSucursal,
-                      )
-                        ? "#1B3C53"
-                        : "#D2C1B6"
-                    }
-                  />
+                  <Cell key={i} fill={i === topIdx ? "#1B3C53" : "#D2C1B6"} />
                 ))}
               </Bar>
             </BarChart>
@@ -364,16 +371,16 @@ export default function Reportes() {
         )}
       </div>
 
-      {/* Fila de graficas de detalle */}
+      {/* Fila: Tendencia + Metodos de pago */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: "1.4fr 1fr",
           gap: "20px",
           marginBottom: "20px",
         }}
       >
-        {/* Tendencia diaria */}
+        {/* Tendencia diaria con sombra de area */}
         <div style={card}>
           <p
             style={{
@@ -381,7 +388,7 @@ export default function Reportes() {
               fontWeight: 600,
               fontSize: "15px",
               color: "#1B3C53",
-              marginBottom: "4px",
+              marginBottom: "2px",
             }}
           >
             Tendencia diaria
@@ -391,15 +398,16 @@ export default function Reportes() {
           >
             {sucursalActual}
           </p>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={220}>
             <AreaChart
               data={ventasPorDia}
-              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
             >
               <defs>
-                <linearGradient id="gradNavy" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#1B3C53" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#1B3C53" stopOpacity={0} />
+                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#456882" stopOpacity={0.35} />
+                  <stop offset="60%" stopColor="#456882" stopOpacity={0.12} />
+                  <stop offset="100%" stopColor="#456882" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid
@@ -409,25 +417,40 @@ export default function Reportes() {
               />
               <XAxis
                 dataKey="fecha"
-                tick={{ fontSize: 10, fill: "#8a9eb0" }}
+                tick={{ fontSize: 10, fill: "#8a9eb0", fontFamily: "DM Sans" }}
                 axisLine={false}
                 tickLine={false}
+                interval="preserveStartEnd"
               />
               <YAxis
                 tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                tick={{ fontSize: 10, fill: "#8a9eb0" }}
+                tick={{ fontSize: 10, fill: "#8a9eb0", fontFamily: "DM Sans" }}
                 axisLine={false}
                 tickLine={false}
+                width={44}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={<CustomTooltip />}
+                cursor={{
+                  stroke: "#D2C1B6",
+                  strokeWidth: 1,
+                  strokeDasharray: "4 4",
+                }}
+              />
               <Area
-                type="monotone"
+                type="monotoneX"
                 dataKey="total"
-                name="Total"
+                name="Promedio diario"
                 stroke="#1B3C53"
-                strokeWidth={2}
-                fill="url(#gradNavy)"
+                strokeWidth={2.5}
+                fill="url(#areaGrad)"
                 dot={false}
+                activeDot={{
+                  r: 5,
+                  fill: "#1B3C53",
+                  stroke: "white",
+                  strokeWidth: 2,
+                }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -441,24 +464,24 @@ export default function Reportes() {
               fontWeight: 600,
               fontSize: "15px",
               color: "#1B3C53",
-              marginBottom: "4px",
+              marginBottom: "2px",
             }}
           >
             Metodos de pago
           </p>
           <p
-            style={{ fontSize: "12px", color: "#8a9eb0", marginBottom: "20px" }}
+            style={{ fontSize: "12px", color: "#8a9eb0", marginBottom: "12px" }}
           >
             {sucursalActual}
           </p>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
                 data={metodosPago}
                 cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={85}
+                cy="45%"
+                innerRadius={62}
+                outerRadius={92}
                 dataKey="value"
                 paddingAngle={3}
               >
@@ -469,15 +492,28 @@ export default function Reportes() {
               <Legend
                 iconType="circle"
                 iconSize={8}
-                wrapperStyle={{ fontSize: "12px", fontFamily: "DM Sans" }}
+                wrapperStyle={{
+                  fontSize: "12px",
+                  fontFamily: "DM Sans",
+                  paddingTop: "8px",
+                }}
               />
-              <Tooltip />
+              <Tooltip
+                formatter={(v, n) => [v, n]}
+                contentStyle={{
+                  borderRadius: "10px",
+                  border: "none",
+                  background: "#1B3C53",
+                  color: "white",
+                  fontSize: "13px",
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Productos top */}
+      {/* Productos mas vendidos — ancho completo */}
       <div style={card}>
         <p
           style={{
@@ -485,7 +521,7 @@ export default function Reportes() {
             fontWeight: 600,
             fontSize: "15px",
             color: "#1B3C53",
-            marginBottom: "4px",
+            marginBottom: "2px",
           }}
         >
           Productos mas vendidos
@@ -493,11 +529,12 @@ export default function Reportes() {
         <p style={{ fontSize: "12px", color: "#8a9eb0", marginBottom: "20px" }}>
           {sucursalActual} · top 7
         </p>
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={230}>
           <BarChart
             data={productosTop}
             layout="vertical"
-            margin={{ left: 0, right: 20, top: 0, bottom: 0 }}
+            margin={{ left: 0, right: 24, top: 0, bottom: 0 }}
+            barCategoryGap="30%"
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -513,12 +550,12 @@ export default function Reportes() {
             <YAxis
               dataKey="nombre"
               type="category"
-              tick={{ fontSize: 11, fill: "#456882", fontFamily: "DM Sans" }}
-              width={130}
+              tick={{ fontSize: 12, fill: "#456882", fontFamily: "DM Sans" }}
+              width={145}
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f9f3ef" }} />
             <Bar
               dataKey="unidades"
               name="Unidades"

@@ -241,7 +241,7 @@ function AppContent() {
         style={{
           marginLeft: "220px",
           flex: 1,
-          padding: "36px",
+          padding: "32px 40px",
           minHeight: "100vh",
         }}
       >
