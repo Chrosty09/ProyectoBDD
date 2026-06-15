@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import PuntoDeVenta from "./pages/PuntoDeVenta";
 import Reportes from "./pages/Reportes";
+import Nodos from "./pages/Nodos";
 
 const SUCURSALES_NOMBRES = {
   0: "Corporativo",
@@ -54,6 +55,28 @@ function IconReportes({ active }) {
       <line x1="18" y1="20" x2="18" y2="10" />
       <line x1="12" y1="20" x2="12" y2="4" />
       <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  );
+}
+
+function IconNodos({ active }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={active ? "#D2C1B6" : "#8a9eb0"}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="8.5" y="14" width="7" height="7" rx="1" />
+      <path d="M10 6.5h4" />
+      <path d="M6.5 10v4" />
+      <path d="M17.5 10v4" />
     </svg>
   );
 }
@@ -170,6 +193,7 @@ function Sidebar({ pagina, setPagina }) {
         {navItem("ventas", "Punto de Venta", IconVentas)}
         {usuario?.rol !== "cajero" &&
           navItem("reportes", "Reportes", IconReportes)}
+        {usuario?.rol !== "cajero" && navItem("nodos", "Nodos", IconNodos)}
       </nav>
 
       {/* Usuario */}
@@ -231,12 +255,19 @@ function AppContent() {
   const [pagina, setPagina] = useState("ventas");
 
   if (!usuario) {
-    return <Login onLogin={() => setPagina("ventas")} />;
+    return (
+      <Login
+        onLogin={(user) => setPagina(user?.rol === "admin" ? "reportes" : "ventas")}
+      />
+    );
   }
+
+  const paginaActual =
+    usuario?.rol === "admin" && pagina === "ventas" ? "reportes" : pagina;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#F9F3EF" }}>
-      <Sidebar pagina={pagina} setPagina={setPagina} />
+      <Sidebar pagina={paginaActual} setPagina={setPagina} />
       <main
         style={{
           marginLeft: "220px",
@@ -245,8 +276,9 @@ function AppContent() {
           minHeight: "100vh",
         }}
       >
-        {pagina === "ventas" && <PuntoDeVenta />}
-        {pagina === "reportes" && <Reportes />}
+        {paginaActual === "ventas" && <PuntoDeVenta />}
+        {paginaActual === "reportes" && <Reportes />}
+        {paginaActual === "nodos" && <Nodos />}
       </main>
     </div>
   );

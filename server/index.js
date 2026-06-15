@@ -8,18 +8,30 @@ const { connectAll } = require("./config/db");
 
 const app = express();
 
-app.use(cors());
+const corsOptions = process.env.CLIENT_URL
+  ? { origin: process.env.CLIENT_URL }
+  : {};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
-// Ruta de salud para verificar que el servidor responde
+// Ruta de salud para verificar que el servidor responde sin consultar clusters.
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date() });
+  res.json({
+    ok: true,
+    service: "QuickMart API",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "development",
+  });
 });
 
-// Aqui se montaran las rutas cuando las generemos
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/ventas", require("./routes/ventas"));
 app.use("/api/reportes", require("./routes/reportes"));
+app.use("/api/productos", require("./routes/productos"));
+app.use("/api/inventario", require("./routes/inventario"));
+app.use("/api/nodos", require("./routes/nodos"));
 
 const PORT = process.env.PORT || 4000;
 

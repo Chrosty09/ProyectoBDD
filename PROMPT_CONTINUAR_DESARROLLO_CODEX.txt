@@ -1,0 +1,632 @@
+﻿PROMPT PARA CODEX - CONTINUAR DESARROLLO DEL PROYECTO BDD DISTRIBUIDA QUICKMART
+================================================================================
+
+Contexto base
+-------------
+Estoy trabajando en el proyecto ubicado en:
+C:\Users\mhuba\Documents\8vo\ProyectoBDD
+
+El proyecto corresponde a una aplicacion web distribuida que simula el sistema de ventas de una cadena de tiendas de conveniencia tipo OXXO/QuickMart. Debe demostrar conceptos de Bases de Datos Distribuidas: fragmentacion horizontal, replicacion, control de acceso por nodo, reportes multi-nodo y agregacion de datos distribuidos.
+
+Tambien existe un documento de referencia/rubrica en:
+C:\Users\mhuba\Desktop\Proyecto_BD.docx
+
+Ese documento debe seguir siendo la fuente principal para decidir prioridades. La entrega final se evalua con estos criterios:
+
+1. Documentacion teorica y tecnica: 15%
+   Debe existir documentacion clara del sistema, APIs, arquitectura, fragmentacion, replica sets, decisiones tecnicas y pruebas.
+
+2. Arquitectura del sistema documental: 10%
+   Debe haber diagrama de arquitectura de tres capas: frontend React/Vite, backend Node/Express, 11 clusters MongoDB Atlas, API gateway/servicio de agregacion, nodo HQ y sucursales.
+
+3. Fragmentacion de datos: 20%
+   Debe demostrarse fragmentacion horizontal primaria de ventas por sucursal, fragmentacion derivada de inventario por sucursal, reconstruccion logica de datos mediante union/agregacion multi-sucursal, completitud, reconstruccion y disjuncion.
+
+4. Funcionamiento del sistema: 30%
+   Debe haber sistema web funcional con login por sucursal, registro de ventas, actualizacion de inventario, reportes multi-sucursal con graficas, control de acceso RBAC, y de preferencia despliegue publico.
+
+5. Entrevista con el maestro: 25%
+   El equipo debe poder explicar fragmentacion horizontal, propiedades formales, por que no se usa sharding en Atlas M0, como funciona un Replica Set, y ejecutar en vivo una venta y un reporte.
+
+Estado actual detectado del repositorio
+---------------------------------------
+Estructura principal:
+
+- client/: frontend React/Vite.
+- server/: backend Express/Mongoose.
+- client/node_modules y server/node_modules ya existen localmente.
+- No se observo README raiz con instrucciones completas del sistema.
+- No se observo carpeta docs/ con arquitectura, API, demo o explicacion teorica.
+- Se genero build de frontend correctamente con Vite invocado desde node.exe. El build paso, aunque Vite aviso que el chunk JS supera 500 kB por Recharts y bundle unico.
+
+Stack real instalado:
+
+Frontend real:
+- React 19.2.6
+- Vite 8.0.x
+- Tailwind CSS 4.3.x
+- Axios 1.17.x
+- Recharts 3.8.x
+
+Backend real:
+- Express 5.2.x
+- Mongoose 9.7.x
+- jsonwebtoken 9.x
+- bcrypt 6.x
+- dotenv 17.x
+- cors 2.x
+- @faker-js/faker 10.x
+
+OJO: El DOCX menciona versiones planeadas como React 18, Vite 5, Express 4, Mongoose 8, Faker 8, etc. Para la entrega final hay que decidir si se actualiza la documentacion para coincidir con el stack real o se ajustan dependencias. Lo mas practico es actualizar documentacion a las versiones reales instaladas, salvo que el profesor haya pedido versiones especificas.
+
+Backend actual
+--------------
+Archivos clave:
+
+- server/index.js
+  Configura Express, CORS, JSON, ruta /health, monta /api/auth, /api/ventas y /api/reportes. Llama connectAll() antes de escuchar en PORT.
+
+- server/config/db.js
+  Mantiene un mapa de conexiones MongoDB: hq, s01, s02, ..., s10. Lee URIs MONGO_HQ y MONGO_S01...MONGO_S10 desde .env. Implementa connectAll(), getConn(key), getConnBySucursal(sucursalId). Esto es clave para demostrar distribucion fisica por cluster.
+
+- server/middleware/auth.js
+  Implementa auth JWT, checkBranch y soloGerentes. Cajero no ve reportes. Admin puede acceder a cualquier sucursal. Gerente debe quedar limitado a su sucursal.
+
+- server/routes/auth.js
+  Login por username/password/sucursalId. Si sucursalId es 0 busca en HQ; si es 1-10 busca en el cluster de esa sucursal. Genera JWT con userId, username, rol, sucursalId.
+
+- server/routes/ventas.js
+  POST /api/ventas: registra venta en cluster de la sucursal autenticada, consulta catalogo en HQ, valida stock en inventario de sucursal, descuenta inventario y crea documento Venta.
+  GET /api/ventas/sucursal/:sucursalId: historial con filtros desde/hasta/limite.
+
+- server/routes/reportes.js
+  GET /api/reportes/ventas-por-sucursal: consulta en paralelo multiples sucursales y regresa totalVentas, numVentas, ticketPromedio y error por sucursal.
+  GET /api/reportes/ventas-por-dia/:sucursalId
+  GET /api/reportes/productos-top/:sucursalId
+  GET /api/reportes/metodos-pago/:sucursalId
+
+- server/models
+  Producto, Venta, Inventario, Sucursal, Usuario. Los schemas cubren lo basico de la rubrica.
+
+- server/seed/seed.js
+  Genera 200+ productos, 10 sucursales, admin HQ, gerente y cajeros por sucursal, inventario por sucursal y 200+ ventas por sucursal. Usuarios demo detectados:
+  admin / admin1234 en sucursal 0
+  gerente_s01 / gerente1234, gerente_s02 / gerente1234, etc.
+  cajero1_s01 / cajero1234, cajero2_s01 / cajero1234, etc.
+
+Brechas backend importantes
+---------------------------
+1. No hay endpoint publico/protegido para listar catalogo de productos desde HQ.
+   El POS obliga a teclear SKU manualmente, lo cual complica la demo. Crear GET /api/productos con busqueda por texto, sku, categoria, paginacion y activo=true.
+
+2. No hay endpoint de inventario consultable por sucursal para frontend.
+   Crear GET /api/inventario/sucursal/:sucursalId, con filtros por texto, bajoStock=true, categoria si se cruza contra productos HQ, limite y paginacion.
+
+3. No hay endpoint de estado de nodos para demostrar arquitectura distribuida.
+   Crear GET /api/nodos/status que indique hq/s01...s10: conectado, nombre, sucursalId, latencia aproximada si se puede medir con ping simple, conteos basicos opcionales. Esto seria muy pro para la demo.
+
+4. En POST /api/ventas la actualizacion de inventario se hace dentro de un ciclo y no es transaccional entre lectura/venta/descuento. MongoDB multi-cluster no permite transaccion global simple; documentar esto. Como mejora minima, validar todos los productos y stocks primero, despues descontar y crear venta. Si falla a mitad, puede haber inconsistencia. Para demo puede bastar, pero conviene reducir riesgo.
+
+5. No hay ruta de anulacion/devolucion de venta. No es obligatoria por rubrica, pero es una mejora profesional si hay tiempo: POST /api/ventas/:id/cancelar que restaure stock y marque venta cancelada.
+
+6. No hay tests automatizados. Agregar pruebas minimas o al menos una coleccion Postman documentada para auth, venta, historial y reportes.
+
+7. server/package.json solo tiene test placeholder. Agregar scripts:
+   - dev: node --watch index.js
+   - start: node index.js
+   - seed: node seed/seed.js
+
+8. Revisar CORS para despliegue. Ahora app.use(cors()) permite todo. Para entrega esta bien en demo, pero documentar variable CLIENT_URL y configuracion segura opcional.
+
+Frontend actual
+---------------
+Archivos clave:
+
+- client/src/App.jsx
+  Maneja AuthProvider, login si no hay usuario, sidebar fija y paginas ventas/reportes con estado local pagina. No usa React Router. Sidebar incluye QuickMart, rol, sucursal y logout.
+
+- client/src/pages/Login.jsx
+  Pantalla visualmente agradable con panel izquierdo y formulario derecho. Selecciona sucursal, usuario y password. Llama AuthContext.login.
+
+- client/src/pages/PuntoDeVenta.jsx
+  Permite agregar items solo por SKU y cantidad. Muestra lista simple de SKU/cantidad, metodo de pago y confirma venta. Llama POST /ventas. No muestra nombre, precio, subtotal ni total antes de registrar. No usa catalogo ni inventario visual.
+
+- client/src/pages/Reportes.jsx
+  Dashboard con KPIs, grafica de ingresos por sucursal, tendencia diaria, metodos de pago y productos mas vendidos. Usa Recharts. Admin puede seleccionar sucursal. No tiene filtros desde/hasta en UI aunque backend los soporta. No muestra errores por sucursal, ni estado de nodos, ni exportacion.
+
+- client/src/context/AuthContext.jsx y client/src/api/axios.js
+  Guardan token y usuario en localStorage. Axios inyecta Authorization y limpia sesion en 401.
+
+- client/src/components/Navbar.jsx
+  Existe un Navbar antiguo con Tailwind pero no se usa porque App.jsx implementa Sidebar inline. Se debe eliminar o reutilizar, pero no dejar duplicado muerto si se quiere calidad.
+
+- client/src/App.css
+  Parece CSS sobrante de plantilla Vite/React con clases hero/counter/docs. No se ve usado por la app actual. Conviene limpiarlo si no esta importado o confirmar.
+
+- client/src/index.css
+  Define Tailwind 4, paleta QuickMart, tipografias DM Sans/Sora, scrollbar y animaciones. Pero no se importan fuentes externas; si se quiere mantener esas fuentes, agregar link en index.html o usar fuentes del sistema.
+
+Brechas frontend prioritarias
+-----------------------------
+Esta es la parte mas importante a mejorar porque el sistema ya tiene backend util, pero la UI no demuestra suficiente para una evaluacion visual y funcional.
+
+1. POS demasiado basico.
+   Falta catalogo visible, busqueda por SKU/nombre/codigo de barras, seleccion rapida de productos, mostrar stock disponible, precio unitario, subtotal por item, total antes de pagar, validacion visual de stock insuficiente y resumen tipo ticket.
+
+2. No hay historial de ventas del turno.
+   La rubrica/documento pide historial de ventas del turno para cajero activo. Backend ya tiene GET /api/ventas/sucursal/:sucursalId. Implementar panel lateral o seccion inferior con ultimas 10-20 ventas, fecha, cajero, total, metodo, numero de items y boton ver detalle.
+
+3. No hay filtros de fecha en reportes.
+   Backend soporta desde/hasta en varios endpoints. UI debe tener filtros Hoy, Semana, Mes, Personalizado y aplicarlos a ventas por sucursal y ventas por dia. Esto ayuda a cumplir reporte diario/semanal/mensual.
+
+4. No hay selector multi-sucursal visual para admin.
+   Backend soporta query sucursales=1,2,3. UI podria permitir seleccionar todas, regiones o sucursales especificas. Esto demuestra consultas en paralelo a 5+ clusters.
+
+5. No se muestran errores parciales por cluster.
+   /ventas-por-sucursal regresa error por sucursal. La UI debe mostrar chips o tabla de estado: OK/Error por nodo. Esto demuestra tolerancia parcial y arquitectura distribuida.
+
+6. No hay vista explicita de arquitectura distribuida.
+   Agregar pagina "Nodos" o seccion en dashboard con HQ + 10 sucursales, estado conectado, colecciones principales y contador/latencia opcional. Aunque sea informativa, se ve muy profesional y ayuda mucho en entrevista.
+
+7. Responsividad incompleta.
+   App usa sidebar fija de 220px y grids de 4 columnas; puede romper en pantallas pequenas. Agregar layout responsive: sidebar colapsable o topbar en movil, grids 1/2/4 columnas, charts con alturas adaptadas.
+
+8. Estilos inline excesivos.
+   No es fatal, pero dificulta mantenimiento. Se puede migrar gradualmente a componentes reutilizables: Button, Card, Input, Select, Badge, PageHeader, EmptyState, LoadingState, ErrorBanner.
+
+9. Accesibilidad y pulido.
+   Falta aria-label en botones icono, labels asociados, estados focus consistentes, contraste revisado, mensajes de error persistentes en reportes, skeletons/loading states, empty states.
+
+10. No hay exportacion visual de graficas.
+   El documento pide exportacion visual de graficas en pantalla. Puede interpretarse como mostrar graficas, pero para verse pro agregar boton exportar PNG o CSV en reportes. Minimo exportar CSV de resumen.
+
+11. No hay datos auxiliares de demo visibles.
+   Agregar en login un bloque discreto de credenciales demo o boton "usar admin demo", "usar gerente S01", "usar cajero S01" puede acelerar la presentacion. Si se considera inseguro, dejarlo solo en modo desarrollo con import.meta.env.DEV.
+
+12. No hay proteccion fina en frontend por rol.
+   App oculta Reportes a cajero, pero POS sigue visible para admin y gerente. Definir comportamiento esperado: admin puede no vender porque sucursalId 0 no tiene cluster de ventas. Si admin entra al POS, POST /ventas puede fallar porque getConnBySucursal(0) no existe. Solucion: si rol admin, default pagina reportes y ocultar/deshabilitar POS o permitir seleccionar sucursal operativa para venta demo.
+
+Fases recomendadas de desarrollo
+================================
+
+FASE 0 - Respaldo, limpieza inicial y verificacion reproducible
+---------------------------------------------------------------
+Objetivo: dejar el proyecto en un estado confiable antes de tocar funcionalidades.
+
+Tareas:
+1. Ejecutar git status y no revertir cambios del usuario.
+2. Confirmar que client build compila:
+   node <ruta_node_codex> client/node_modules/vite/bin/vite.js build
+   o npm run build si npm esta disponible.
+3. Agregar scripts utiles:
+   server/package.json: dev, start, seed.
+   client/package.json ya tiene dev/build/lint/preview.
+4. Crear README raiz con instrucciones:
+   - requisitos
+   - variables .env necesarias, sin secretos reales
+   - como correr backend
+   - como correr frontend
+   - usuarios demo
+   - como ejecutar seed
+   - rutas principales
+5. Crear .env.example para server, sin credenciales reales:
+   MONGO_HQ=
+   MONGO_S01=
+   ...
+   MONGO_S10=
+   JWT_SECRET=
+   PORT=4000
+6. Crear client/.env.example:
+   VITE_API_URL=http://localhost:4000/api
+7. Limpiar archivos sobrantes si se confirma que no se usan:
+   - client/src/App.css si no esta importado.
+   - client/src/components/Navbar.jsx si no se reutilizara.
+   - assets react.svg/vite.svg si no se usan.
+8. Asegurar que dist/ quede ignorado si no debe versionarse.
+
+Criterios de aceptacion:
+- El proyecto se puede levantar siguiendo README sin adivinar.
+- No se exponen secretos.
+- Build frontend exitoso.
+- Backend inicia con start/dev cuando hay .env valido.
+
+FASE 1 - Backend de soporte para un frontend profesional
+-------------------------------------------------------
+Objetivo: exponer datos que el frontend necesita para no depender de teclear SKU a ciegas.
+
+Tareas:
+1. Crear server/routes/productos.js.
+   Endpoints propuestos:
+   - GET /api/productos
+     Query: q, sku, categoria, limite, page.
+     Debe consultar HQ.
+     Debe devolver: productos, total, page, limite.
+   - GET /api/productos/:sku
+     Devuelve producto por SKU desde HQ.
+2. Crear server/routes/inventario.js.
+   Endpoints propuestos:
+   - GET /api/inventario/sucursal/:sucursalId
+     Protegido con auth + checkBranch.
+     Query: q, bajoStock, limite, page.
+     Devuelve inventario de esa sucursal. Idealmente enriquecer con precio/categoria desde HQ si es simple; si no, al menos sku, nombreProducto, stock, nivelReorden.
+3. Crear server/routes/nodos.js.
+   Endpoints propuestos:
+   - GET /api/nodos/status
+     Protegido, solo admin/gerente.
+     Devuelve HQ y sucursales con: key, nombre, sucursalId, connected, colecciones esperadas, error si falla.
+     Opcional: conteos de ventas/inventario/productos y latencia aproximada.
+4. Montar rutas en server/index.js:
+   app.use('/api/productos', require('./routes/productos'));
+   app.use('/api/inventario', require('./routes/inventario'));
+   app.use('/api/nodos', require('./routes/nodos'));
+5. Mejorar POST /api/ventas:
+   - Validar cantidad numerica positiva.
+   - Validar metodoPago permitido.
+   - Primero validar todos los productos y stocks, despues descontar y crear venta.
+   - Documentar que no es transaccion distribuida global.
+6. Agregar GET /api/ventas/:id o mejorar historial para detalle de venta.
+7. Manejar errores con mensajes consistentes: { error, detalle?, code? }.
+
+Criterios de aceptacion:
+- POS puede buscar productos reales.
+- POS puede mostrar stock antes de vender.
+- Dashboard puede mostrar estado de nodos.
+- Control de acceso por sucursal sigue funcionando.
+
+FASE 2 - Refactor frontend base y sistema visual
+------------------------------------------------
+Objetivo: preparar la UI para crecer sin duplicar estilos inline por todos lados.
+
+Tareas:
+1. Crear estructura recomendada:
+   client/src/components/ui/Card.jsx
+   client/src/components/ui/Button.jsx
+   client/src/components/ui/Input.jsx
+   client/src/components/ui/Select.jsx
+   client/src/components/ui/Badge.jsx
+   client/src/components/ui/EmptyState.jsx
+   client/src/components/ui/LoadingState.jsx
+   client/src/components/ui/ErrorBanner.jsx
+   client/src/components/layout/Sidebar.jsx
+   client/src/components/layout/PageHeader.jsx
+2. Mover Sidebar de App.jsx a componente propio.
+3. Ajustar AppContent para rol admin:
+   - admin inicia en reportes o nodos, no en ventas.
+   - cajero inicia en ventas.
+   - gerente puede iniciar en reportes o ventas segun se prefiera.
+4. Si se mantiene navegacion por estado local, documentarlo. Si se quiere mas pro, agregar react-router-dom, pero solo si vale la pena. Para el proyecto actual puede bastar estado local.
+5. Reemplazar estilos inline repetidos por clases Tailwind o componentes. No es necesario migrar todo de golpe; priorizar POS y Reportes.
+6. Agregar fuentes reales en client/index.html si se desea usar Sora y DM Sans:
+   - link preconnect a fonts.googleapis.com/fonts.gstatic.com
+   - link CSS de Sora y DM Sans
+   Si se prefiere evitar internet, cambiar CSS a system-ui.
+7. Hacer layout responsive:
+   - desktop: sidebar fija.
+   - tablet/movil: topbar o sidebar colapsable.
+   - charts y cards en una columna.
+8. Agregar estados globales coherentes: cargando, error, vacio.
+
+Criterios de aceptacion:
+- La app no se rompe en 375px, 768px y desktop.
+- La navegacion por rol es clara.
+- El codigo queda mas facil de modificar.
+- El look sigue siendo QuickMart y no una plantilla generica.
+
+FASE 3 - Punto de Venta profesional
+-----------------------------------
+Objetivo: convertir el POS en una pantalla convincente de demo y cumplir el modulo de ventas de la rubrica.
+
+Tareas:
+1. Crear una pantalla POS de dos o tres zonas:
+   - Busqueda/catalogo a la izquierda o arriba.
+   - Carrito/ticket a la derecha.
+   - Historial de ventas abajo o lateral.
+2. Busqueda de productos:
+   - Input por SKU, codigo de barras o nombre.
+   - Debounce de 250-400 ms.
+   - Consumir GET /api/productos o GET /api/inventario/sucursal/:id.
+   - Mostrar nombre, categoria, precio, stock, SKU.
+   - Boton agregar.
+3. Carrito mejorado:
+   - Mostrar producto, SKU, cantidad, precio unitario, subtotal.
+   - Botones + y - para cantidad.
+   - Boton quitar item.
+   - Total calculado en frontend antes de enviar.
+   - Metodo de pago como control segmentado.
+4. Validacion:
+   - No permitir cantidad > stock si se conoce el stock.
+   - Mostrar alerta si hay stock insuficiente.
+   - Deshabilitar confirmar si carrito vacio.
+5. Confirmacion de venta:
+   - POST /api/ventas con items [{ sku, cantidad }], metodoPago.
+   - Al exito mostrar ticket: total, folio/id, sucursal, cajero, fecha, metodo.
+   - Limpiar carrito.
+   - Refrescar historial e inventario.
+6. Historial de ventas del turno:
+   - Consumir GET /api/ventas/sucursal/:sucursalId?limite=10.
+   - Mostrar fecha/hora, total, metodo, items count.
+   - Modal o panel de detalle con productos vendidos.
+7. UX de demo:
+   - Agregar botones "Producto rapido" para 6-8 productos con stock.
+   - Agregar lectura simulada de codigo de barras: enter en input agrega si encuentra producto exacto.
+   - Mostrar chip "Sucursal actual: S01" y "Cluster: s01" para reforzar distribucion.
+8. Caso admin:
+   - Si admin no puede vender, mostrar pantalla informativa: "El usuario corporativo consulta reportes; usa cajero/gerente para registrar ventas".
+   - Alternativa: selector de sucursal para venta demo, pero requiere backend aceptando sucursalId con admin. Solo hacerlo si hay tiempo.
+
+Criterios de aceptacion:
+- Un cajero puede iniciar sesion, buscar productos reales, agregar varios items, ver total, confirmar venta y ver historial actualizado.
+- La venta descuenta inventario.
+- La UI permite hacer una demo sin recordar SKUs.
+- Se ve claro que la venta cae en el cluster de la sucursal autenticada.
+
+FASE 4 - Reportes avanzados y demostracion multi-nodo
+-----------------------------------------------------
+Objetivo: maximizar el 30% de funcionamiento y el 20% de fragmentacion mostrando datos distribuidos de forma visual.
+
+Tareas:
+1. Filtros de fecha:
+   - Hoy
+   - Ultimos 7 dias
+   - Mes actual
+   - Ultimos 6 meses
+   - Personalizado desde/hasta
+   Aplicar a /ventas-por-sucursal y /ventas-por-dia.
+2. Selector de sucursales para admin:
+   - Todas
+   - Por region si se define mapping
+   - Seleccion manual multiple
+   Llamar /ventas-por-sucursal?sucursales=1,2,3,4,5 para demostrar 5+ clusters.
+3. Mejorar KPIs:
+   - Ventas totales
+   - Numero de transacciones
+   - Ticket promedio
+   - Sucursal lider
+   - Producto lider
+   - Metodo de pago dominante
+4. Mostrar tabla de sucursales:
+   - Sucursal
+   - Total ventas
+   - Num ventas
+   - Ticket promedio
+   - Estado nodo/error
+   Esto ayuda a explicar reconstruccion de datos globales.
+5. Graficas:
+   - Barras por sucursal.
+   - Area/linea por dia.
+   - Barras horizontales productos top.
+   - Dona metodos de pago.
+6. Exportacion:
+   - Boton Exportar CSV del resumen por sucursal.
+   - Opcional: exportar PNG de grafica usando html-to-image o canvas si se instala dependencia. Si no, documentar que las graficas son visuales en pantalla.
+7. Manejo de errores:
+   - Si un cluster falla, mostrar alerta no fatal y conservar datos de los demas.
+   - Mostrar "Consulta parcial" con lista de nodos fallidos.
+8. Gerente:
+   - Gerente solo ve su sucursal.
+   - UI debe explicar/mostrar que el alcance esta limitado por rol.
+9. Cajero:
+   - Cajero no debe poder acceder a reportes. Ya esta oculto, pero si hay rutas futuras proteger tambien.
+
+Criterios de aceptacion:
+- Admin puede ver reporte consolidado de 10 sucursales.
+- Gerente solo ve su sucursal.
+- Filtros de fecha cambian resultados.
+- La UI muestra que el backend consulta nodos en paralelo.
+- Hay evidencia visual de reconstruccion global de fragmentos.
+
+FASE 5 - Vista de arquitectura/nodos y material para entrevista
+---------------------------------------------------------------
+Objetivo: convertir conceptos teoricos en una pantalla y documentos faciles de defender.
+
+Tareas:
+1. Crear pagina "Nodos" o seccion en Reportes:
+   - Nodo HQ: productos, sucursales, usuarios admin.
+   - S01-S10: ventas, inventario, usuarios cajeros/gerentes.
+   - Estado conectado/error.
+   - Cluster key.
+   - Sucursal/ciudad.
+   - Conteos aproximados.
+2. Agregar mini-diagrama visual en UI:
+   - Frontend -> API -> HQ + S01...S10.
+   - No necesita ser muy complejo; puede ser una grilla de nodos conectados por lineas CSS simples o cards compactas.
+3. Agregar textos cortos en la UI para demo, no largos:
+   - "Fragmentacion horizontal por sucursal"
+   - "Reconstruccion: agregacion en paralelo"
+   - "RBAC: alcance por rol y sucursal"
+4. Crear docs/arquitectura.md:
+   - Tres capas.
+   - Por que 11 clusters.
+   - Como se conectan.
+   - Que colecciones vive en HQ y sucursales.
+5. Crear docs/fragmentacion.md:
+   - Fragmentacion horizontal primaria de ventas.
+   - Fragmentacion derivada de inventario.
+   - Completitud, reconstruccion, disjuncion con ejemplos concretos.
+   - Por que no sharding en Atlas M0.
+6. Crear docs/replicacion.md:
+   - Atlas M0 usa Replica Set administrado.
+   - Primario/secundarios/failover.
+   - Diferencia entre replicacion interna de cada cluster y fragmentacion entre clusters.
+7. Crear docs/demo.md:
+   Guion de demo de 5-8 minutos:
+   - Login admin y mostrar reportes/nodos.
+   - Login cajero S01 y registrar venta.
+   - Ver historial de venta.
+   - Volver a admin/gerente y ver reporte actualizado.
+   - Explicar donde se guardo la venta.
+8. Crear docs/api.md o coleccion Postman:
+   - /health
+   - /api/auth/login
+   - /api/ventas
+   - /api/ventas/sucursal/:id
+   - /api/reportes/*
+   - /api/productos
+   - /api/inventario
+   - /api/nodos/status
+
+Criterios de aceptacion:
+- Cualquier integrante puede abrir docs/demo.md y saber que decir/hacer.
+- La arquitectura se ve en UI y en documentacion.
+- Los criterios teoricos de rubrica estan cubiertos con lenguaje claro.
+
+FASE 6 - Despliegue y preparacion de entrega
+--------------------------------------------
+Objetivo: asegurar que el sistema funcione en URLs publicas y que el repo sea evaluable hasta la fecha requerida.
+
+Tareas:
+1. Backend en Render:
+   - Configurar build/start command.
+   - Variables MONGO_HQ, MONGO_S01...MONGO_S10, JWT_SECRET, PORT si aplica.
+   - Verificar /health publico.
+   - Considerar UptimeRobot o aviso de cold start.
+2. Frontend en Vercel:
+   - Configurar VITE_API_URL con URL de Render + /api.
+   - Verificar login y reportes desde URL publica.
+3. MongoDB Atlas:
+   - Verificar IP allowlist adecuada para Render.
+   - Verificar usuarios/credenciales de clusters.
+   - Confirmar datos sembrados en 10 sucursales y HQ.
+4. README final:
+   - URL frontend.
+   - URL backend health.
+   - Credenciales demo.
+   - Instrucciones de ejecucion local.
+   - Estructura del proyecto.
+5. Evidencias:
+   - Capturas de pantalla: login, POS, reportes, nodos, Compass con clusters, Render, Vercel.
+   - Agregar a docs/evidencias/ o al documento final si se requiere.
+
+Criterios de aceptacion:
+- El profesor puede abrir URL y probar sin instalar nada.
+- El equipo puede correr localmente si Render/Vercel fallan.
+- Las variables sensibles no estan en GitHub.
+
+FASE 7 - Pulido profesional opcional pero recomendable
+-----------------------------------------------------
+Objetivo: agregar detalles que hacen que el proyecto se sienta completo y serio.
+
+Mejoras pro sugeridas:
+1. Modo demo en login:
+   Botones para cargar credenciales admin, gerente S01, cajero S01. Solo en desarrollo o con texto discreto.
+
+2. Busqueda inteligente en POS:
+   Mostrar resultados mientras se escribe, con categorias y stock. Enter agrega producto exacto por SKU.
+
+3. Ticket visual:
+   Al registrar venta, mostrar ticket con folio, sucursal, cajero, fecha, metodo, items y total. Boton imprimir simulado con window.print o vista imprimible.
+
+4. Indicador de cluster destino:
+   En POS mostrar "Venta se guardara en cluster s01" segun sucursal del usuario. Esto conecta UI con teoria.
+
+5. Panel de stock bajo:
+   En POS o Inventario mostrar productos con stock <= nivelReorden. Se ve muy realista.
+
+6. Auditoria simple:
+   Agregar campos o vista de ultimas acciones: ventas recientes por cajero. No es obligatorio.
+
+7. Exportacion CSV:
+   En reportes, exportar resumen por sucursal. Facil de implementar sin dependencias.
+
+8. Error boundaries o fallback de errores:
+   Mostrar mensaje amigable si API esta dormida por Render.
+
+9. Skeleton loading:
+   Cards y graficas con placeholder mientras carga.
+
+10. Code splitting:
+   Cargar Reportes con React.lazy para bajar el chunk inicial porque Recharts pesa. Build actual advierte chunk >500 kB.
+
+11. Normalizar textos con acentos:
+   Revisar UI para usar "Iniciar sesion" -> "Iniciar sesión", "Contrasena" -> "Contraseña", "Metodo" -> "Método", "Vision" -> "Visión", etc. Confirmar encoding UTF-8.
+
+12. Consistencia visual:
+   El proyecto usa mucho azul/arena. Mantenerlo, pero agregar estados semanticos sobrios: verde exito, rojo error, amarillo advertencia, sin saturar.
+
+13. Pruebas manuales documentadas:
+   Crear docs/checklist-pruebas.md con casos de auth, venta, stock insuficiente, gerente vs admin, cajero sin reportes, filtros de reportes.
+
+Orden recomendado de ejecucion para Codex
+=========================================
+
+1. Leer este archivo completo.
+2. Leer Proyecto_BD.docx si esta disponible y verificar si hay cambios en la rubrica.
+3. Ejecutar inventario rapido:
+   rg --files -g '!node_modules' -g '!dist' -g '!build' -g '!.git'
+4. Revisar git status.
+5. Implementar primero FASE 1 endpoints productos/inventario/nodos, porque desbloquean el frontend.
+6. Implementar FASE 3 POS profesional, porque es lo mas visible y cumple ventas/historial.
+7. Implementar FASE 4 reportes con filtros/multi-sucursal/errores parciales.
+8. Implementar FASE 5 docs y vista nodos.
+9. Ejecutar build frontend y pruebas manuales backend con endpoints clave.
+10. Actualizar README y docs finales.
+
+Checklist de rubrica antes de entregar
+======================================
+
+Documentacion teorica y tecnica 15%
+[ ] README raiz completo.
+[ ] docs/api.md o Postman.
+[ ] docs/fragmentacion.md.
+[ ] docs/replicacion.md.
+[ ] docs/demo.md.
+[ ] Versiones de tecnologias actualizadas al stack real.
+
+Arquitectura documental 10%
+[ ] Diagrama de arquitectura con Frontend, Backend, HQ, S01-S10.
+[ ] Explicacion de tres capas.
+[ ] Explicacion de gestor de conexiones multi-cluster.
+[ ] Evidencia de MongoDB Atlas/Replica Set si se puede.
+
+Fragmentacion de datos 20%
+[ ] Ventas guardadas por sucursal en cluster correspondiente.
+[ ] Inventario por sucursal.
+[ ] HQ con productos/sucursales/admin.
+[ ] Reporte consolidado reconstruye datos desde varias sucursales.
+[ ] Se explican completitud, reconstruccion y disjuncion.
+[ ] Se explica por que no se usa sharding en M0.
+
+Funcionamiento del sistema 30%
+[ ] Login por sucursal.
+[ ] JWT persistido y enviado por Axios.
+[ ] RBAC: cajero sin reportes, gerente limitado, admin global.
+[ ] POS con busqueda real de productos.
+[ ] Registro de venta con descuento de inventario.
+[ ] Historial de ventas.
+[ ] Reportes con graficas.
+[ ] Filtros de fecha.
+[ ] Reporte multi-sucursal 5+ clusters.
+[ ] Manejo de errores y loading states.
+[ ] Build frontend exitoso.
+[ ] Backend ejecutable local o desplegado.
+
+Entrevista 25%
+[ ] Guion de demo listo.
+[ ] Credenciales demo claras.
+[ ] Cada integrante entiende su parte.
+[ ] Se puede demostrar una venta en vivo.
+[ ] Se puede demostrar reporte consolidado.
+[ ] Se puede explicar replica set vs fragmentacion.
+
+Notas de cuidado
+================
+
+- No exponer server/.env ni URIs reales en commits o documentacion publica.
+- No depender de recordar SKUs durante demo; crear UI de busqueda/catalogo.
+- No dejar que admin intente vender en sucursal 0 sin manejar el caso.
+- Si un cluster de Atlas esta dormido o inaccesible, la UI debe mostrar error parcial y no fallar toda la pantalla.
+- Actualizar el DOCX o documentacion final para que coincida con el codigo real, especialmente versiones.
+- Mantener node_modules fuera del analisis y del commit si no corresponde.
+- La prioridad visual debe ser: POS profesional, reportes con filtros, vista de nodos, docs.
+
+Resumen ejecutivo para continuar
+================================
+
+El backend ya tiene una base solida para cumplir la rubrica: conexiones multi-cluster, autenticacion por sucursal, roles, venta con descuento de inventario y reportes agregados en paralelo. Lo que mas falta es convertir eso en una experiencia de frontend convincente y demostrable: catalogo real, POS tipo caja, historial de ventas, filtros de reportes, estado de nodos y documentacion alineada con la rubrica.
+
+Si hay poco tiempo, hacer en este orden:
+1. Endpoint productos + endpoint inventario.
+2. POS con busqueda, carrito con total, stock e historial.
+3. Reportes con filtros de fecha y tabla de sucursales con errores por nodo.
+4. Vista/section de nodos y docs/demo.md.
+5. README final con credenciales y despliegue.

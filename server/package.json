@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node --watch index.js",
+    "start": "node index.js",
+    "seed": "node seed/seed.js",
+    "test": "echo \"No automated tests configured\" && exit 0"
   },
   "keywords": [],
   "author": "",

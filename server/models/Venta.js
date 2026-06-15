@@ -17,7 +17,7 @@ const ventaSchema = new mongoose.Schema({
   total:        { type: Number, required: true },
   metodoPago:   {
     type: String,
-    enum: ['efectivo', 'tarjeta', 'transferencia'],
+    enum: ['efectivo', 'tarjeta', 'transferencia', 'vales'],
     required: true,
   },
   timestamp:    { type: Date, default: Date.now },

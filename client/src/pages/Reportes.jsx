@@ -40,6 +40,13 @@ const CHART_COLORS = [
   "#2d5f7a",
 ];
 
+const DATE_PRESETS = {
+  todos: { label: "Todo", days: null },
+  hoy: { label: "Hoy", days: 0 },
+  semana: { label: "7 dias", days: 7 },
+  mes: { label: "30 dias", days: 30 },
+};
+
 const card = {
   background: "white",
   borderRadius: "16px",
@@ -127,7 +134,11 @@ export default function Reportes() {
   const [productosTop, setProductosTop] = useState([]);
   const [metodosPago, setMetodosPago] = useState([]);
   const [sucursalSelec, setSucursalSelec] = useState(usuario?.sucursalId || 1);
+  const [presetFecha, setPresetFecha] = useState("todos");
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [kpis, setKpis] = useState({
     total: 0,
     numVentas: 0,
@@ -137,15 +148,39 @@ export default function Reportes() {
 
   useEffect(() => {
     cargarResumenGeneral();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetFecha, desde, hasta]);
   useEffect(() => {
     cargarDetalleSucursal(sucursalSelec);
-  }, [sucursalSelec]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sucursalSelec, presetFecha, desde, hasta]);
+
+  function getDateParams() {
+    const params = new URLSearchParams();
+    if (presetFecha !== "todos") {
+      const now = new Date();
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      if (DATE_PRESETS[presetFecha]?.days) {
+        start.setDate(start.getDate() - DATE_PRESETS[presetFecha].days);
+      }
+      params.set("desde", start.toISOString());
+      params.set("hasta", now.toISOString());
+      return params;
+    }
+    if (desde) params.set("desde", new Date(`${desde}T00:00:00`).toISOString());
+    if (hasta) params.set("hasta", new Date(`${hasta}T23:59:59`).toISOString());
+    return params;
+  }
 
   async function cargarResumenGeneral() {
     setLoading(true);
+    setError("");
     try {
-      const res = await api.get("/reportes/ventas-por-sucursal");
+      const params = getDateParams();
+      const res = await api.get(
+        `/reportes/ventas-por-sucursal?${params.toString()}`,
+      );
       const datos = res.data.sucursales.map((s) => ({
         ...s,
         nombre: SUCURSALES_NOMBRES[s.sucursalId] || `S${s.sucursalId}`,
@@ -166,6 +201,7 @@ export default function Reportes() {
       });
     } catch (err) {
       console.error(err);
+      setError(err.response?.data?.error || "Error al cargar reportes");
     } finally {
       setLoading(false);
     }
@@ -173,8 +209,10 @@ export default function Reportes() {
 
   async function cargarDetalleSucursal(id) {
     try {
+      const params = getDateParams();
+      const qs = params.toString();
       const [diasRes, topRes, pagosRes] = await Promise.all([
-        api.get(`/reportes/ventas-por-dia/${id}`),
+        api.get(`/reportes/ventas-por-dia/${id}${qs ? `?${qs}` : ""}`),
         api.get(`/reportes/productos-top/${id}?limite=7`),
         api.get(`/reportes/metodos-pago/${id}`),
       ]);
@@ -204,6 +242,7 @@ export default function Reportes() {
       );
     } catch (err) {
       console.error(err);
+      setError(err.response?.data?.error || "Error al cargar detalle");
     }
   }
 
@@ -214,6 +253,43 @@ export default function Reportes() {
   const topIdx = ventasPorSucursal.findIndex(
     (s) => s.nombre === kpis.topSucursal,
   );
+
+  function exportarCSV() {
+    const headers = [
+      "sucursalId",
+      "sucursal",
+      "totalVentas",
+      "numVentas",
+      "ticketPromedio",
+      "estadoNodo",
+      "error",
+    ];
+    const rows = ventasPorSucursal.map((s) => [
+      s.sucursalId,
+      s.nombre,
+      s.totalVentas,
+      s.numVentas,
+      s.ticketPromedio,
+      s.error ? "error" : "ok",
+      s.error || "",
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) =>
+        row
+          .map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`)
+          .join(","),
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `quickmart-reporte-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div style={{ width: "100%" }}>
@@ -243,8 +319,17 @@ export default function Reportes() {
             sucursales activas
           </p>
         </div>
-        {usuario?.rol === "admin" && (
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
+          {usuario?.rol === "admin" && (
+            <>
             <span style={{ fontSize: "12px", color: "#8a9eb0" }}>Detalle:</span>
             <select
               style={{
@@ -267,9 +352,95 @@ export default function Reportes() {
                 </option>
               ))}
             </select>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Filtros */}
+      <div
+        style={{
+          ...card,
+          marginBottom: "20px",
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          flexWrap: "wrap",
+        }}
+      >
+        {Object.entries(DATE_PRESETS).map(([key, value]) => (
+          <button
+            key={key}
+            onClick={() => {
+              setPresetFecha(key);
+              if (key !== "todos") {
+                setDesde("");
+                setHasta("");
+              }
+            }}
+            style={{
+              borderRadius: "10px",
+              border:
+                presetFecha === key ? "1.5px solid #1B3C53" : "1px solid #D2C1B6",
+              background: presetFecha === key ? "#1B3C53" : "white",
+              color: presetFecha === key ? "#F9F3EF" : "#456882",
+              padding: "9px 12px",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {value.label}
+          </button>
+        ))}
+        <input
+          type="date"
+          value={desde}
+          onChange={(e) => {
+            setPresetFecha("todos");
+            setDesde(e.target.value);
+          }}
+          style={filterInput}
+        />
+        <input
+          type="date"
+          value={hasta}
+          onChange={(e) => {
+            setPresetFecha("todos");
+            setHasta(e.target.value);
+          }}
+          style={filterInput}
+        />
+        <button onClick={cargarResumenGeneral} style={refreshButton}>
+          Actualizar
+        </button>
+        <button
+          onClick={exportarCSV}
+          disabled={!ventasPorSucursal.length}
+          style={{
+            ...refreshButton,
+            background: ventasPorSucursal.length ? "#1B3C53" : "#D2C1B6",
+            cursor: ventasPorSucursal.length ? "pointer" : "not-allowed",
+          }}
+        >
+          Exportar CSV
+        </button>
+      </div>
+
+      {error && (
+        <div
+          style={{
+            borderRadius: "10px",
+            padding: "12px 16px",
+            background: "#fff0ee",
+            border: "1px solid #f5c6c0",
+            color: "#b94040",
+            marginBottom: "20px",
+            fontSize: "13px",
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div
@@ -304,6 +475,60 @@ export default function Reportes() {
           value={loading ? "..." : kpis.topSucursal}
           sub="Sucursal con mas ingresos"
         />
+      </div>
+
+      {/* Estado por nodo consultado */}
+      <div style={{ ...card, marginBottom: "20px" }}>
+        <p
+          style={{
+            fontFamily: "Sora, sans-serif",
+            fontWeight: 600,
+            fontSize: "15px",
+            color: "#1B3C53",
+            marginBottom: "14px",
+          }}
+        >
+          Estado de consulta por sucursal
+        </p>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ color: "#456882", fontSize: "12px" }}>
+                <th style={th}>Sucursal</th>
+                <th style={th}>Ventas</th>
+                <th style={th}>Ticket prom.</th>
+                <th style={th}>Nodo</th>
+                <th style={{ ...th, textAlign: "right" }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ventasPorSucursal.map((s) => (
+                <tr key={s.sucursalId} style={{ borderTop: "1px solid #f0ebe5" }}>
+                  <td style={td}>{s.nombre}</td>
+                  <td style={td}>{s.numVentas}</td>
+                  <td style={td}>{formatPeso(s.ticketPromedio)}</td>
+                  <td style={td}>
+                    <span
+                      style={{
+                        borderRadius: "999px",
+                        padding: "5px 9px",
+                        background: s.error ? "#fff0ee" : "#eef7f0",
+                        color: s.error ? "#b94040" : "#2d6b42",
+                        fontWeight: 800,
+                        fontSize: "12px",
+                      }}
+                    >
+                      {s.error ? "Error parcial" : "OK"}
+                    </span>
+                  </td>
+                  <td style={{ ...td, textAlign: "right", fontWeight: 800 }}>
+                    {formatPeso(s.totalVentas)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Ingresos por sucursal — ancho completo */}
@@ -568,3 +793,34 @@ export default function Reportes() {
     </div>
   );
 }
+
+const filterInput = {
+  borderRadius: "10px",
+  padding: "9px 12px",
+  border: "1.5px solid #D2C1B6",
+  background: "white",
+  color: "#1B3C53",
+  fontFamily: "DM Sans, sans-serif",
+};
+
+const refreshButton = {
+  borderRadius: "10px",
+  padding: "9px 12px",
+  border: "none",
+  background: "#456882",
+  color: "#F9F3EF",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const th = {
+  textAlign: "left",
+  padding: "10px 8px",
+  fontWeight: 800,
+};
+
+const td = {
+  padding: "12px 8px",
+  color: "#1B3C53",
+  fontSize: "13px",
+};

@@ -9,11 +9,15 @@ const router = express.Router();
 // Sucursales disponibles en el sistema
 const TODAS_SUCURSALES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+function getModel(conn, name, schema) {
+  return conn.models[name] || conn.model(name, schema);
+}
+
 // Ejecuta el pipeline de agregacion en una sucursal y retorna el resultado
 async function agregadoPorSucursal(sucursalId, pipeline) {
   try {
     const conn  = getConnBySucursal(sucursalId);
-    const Venta = conn.model('Venta', ventaSchema);
+    const Venta = getModel(conn, 'Venta', ventaSchema);
     const resultado = await Venta.aggregate(pipeline);
     return { sucursalId, data: resultado, error: null };
   } catch (err) {
@@ -58,8 +62,19 @@ router.get('/ventas-por-sucursal', auth, soloGerentes, async (req, res) => {
   ];
 
   try {
-    // Consultar todas las sucursales en paralelo
-    const resultados = await Promise.all(ids.map(id => agregadoPorSucursal(id, pipeline)));
+    // Consultar todas las sucursales en paralelo sin romper el reporte global
+    // si un nodo falla.
+    const settled = await Promise.allSettled(
+      ids.map(id => agregadoPorSucursal(id, pipeline))
+    );
+    const resultados = settled.map((result, index) => {
+      if (result.status === 'fulfilled') return result.value;
+      return {
+        sucursalId: ids[index],
+        data: [],
+        error: result.reason?.message || 'Error consultando nodo',
+      };
+    });
 
     // Aplanar y combinar resultados
     const resumen = resultados.map(r => {
@@ -99,7 +114,7 @@ router.get('/ventas-por-dia/:sucursalId', auth, async (req, res) => {
 
   try {
     const conn  = getConnBySucursal(sucursalId);
-    const Venta = conn.model('Venta', ventaSchema);
+    const Venta = getModel(conn, 'Venta', ventaSchema);
 
     const datos = await Venta.aggregate([
       { $match: matchFecha },
@@ -133,7 +148,7 @@ router.get('/productos-top/:sucursalId', auth, async (req, res) => {
 
   try {
     const conn  = getConnBySucursal(sucursalId);
-    const Venta = conn.model('Venta', ventaSchema);
+    const Venta = getModel(conn, 'Venta', ventaSchema);
 
     const datos = await Venta.aggregate([
       { $match: { sucursalId } },
@@ -167,7 +182,7 @@ router.get('/metodos-pago/:sucursalId', auth, async (req, res) => {
 
   try {
     const conn  = getConnBySucursal(sucursalId);
-    const Venta = conn.model('Venta', ventaSchema);
+    const Venta = getModel(conn, 'Venta', ventaSchema);
 
     const datos = await Venta.aggregate([
       { $match: { sucursalId } },
