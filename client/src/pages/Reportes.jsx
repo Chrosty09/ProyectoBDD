@@ -127,6 +127,48 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
+const MetodoPagoTooltip = ({ active, payload, total }) => {
+  if (!active || !payload?.length) return null;
+
+  const dato = payload[0];
+
+  const porcentaje =
+    total > 0 ? ((dato.value / total) * 100).toFixed(1) : "0.0";
+
+  return (
+    <div
+      style={{
+        background: "#1B3C53",
+        borderRadius: "10px",
+        padding: "12px 16px",
+        boxShadow: "0 8px 24px rgba(27,60,83,0.25)",
+      }}
+    >
+      <p
+        style={{
+          color: "#D2C1B6",
+          fontSize: "12px",
+          fontWeight: 700,
+          marginBottom: "6px",
+        }}
+      >
+        {dato.name}
+      </p>
+
+      <p
+        style={{
+          color: "#FFFFFF",
+          fontSize: "16px",
+          fontWeight: 800,
+          textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+        }}
+      >
+        {dato.value} ventas ({porcentaje}%)
+      </p>
+    </div>
+  );
+};
+
 export default function Reportes() {
   const { usuario } = useAuth();
   const [ventasPorSucursal, setVentasPorSucursal] = useState([]);
@@ -250,6 +292,10 @@ export default function Reportes() {
     `$${Number(v).toLocaleString("es-MX", { minimumFractionDigits: 0 })}`;
   const sucursalActual =
     SUCURSALES_NOMBRES[sucursalSelec] || `Sucursal ${sucursalSelec}`;
+  const totalMetodosPago = metodosPago.reduce(
+    (acum, metodo) => acum + metodo.value,
+    0,
+  );
   const topIdx = ventasPorSucursal.findIndex(
     (s) => s.nombre === kpis.topSucursal,
   );
@@ -330,28 +376,30 @@ export default function Reportes() {
         >
           {usuario?.rol === "admin" && (
             <>
-            <span style={{ fontSize: "12px", color: "#8a9eb0" }}>Detalle:</span>
-            <select
-              style={{
-                borderRadius: "10px",
-                padding: "9px 14px",
-                fontSize: "13px",
-                border: "1.5px solid #D2C1B6",
-                background: "white",
-                color: "#1B3C53",
-                fontFamily: "DM Sans, sans-serif",
-                outline: "none",
-                cursor: "pointer",
-              }}
-              value={sucursalSelec}
-              onChange={(e) => setSucursalSelec(parseInt(e.target.value))}
-            >
-              {Object.entries(SUCURSALES_NOMBRES).map(([id, nombre]) => (
-                <option key={id} value={id}>
-                  {nombre}
-                </option>
-              ))}
-            </select>
+              <span style={{ fontSize: "12px", color: "#8a9eb0" }}>
+                Detalle:
+              </span>
+              <select
+                style={{
+                  borderRadius: "10px",
+                  padding: "9px 14px",
+                  fontSize: "13px",
+                  border: "1.5px solid #D2C1B6",
+                  background: "white",
+                  color: "#1B3C53",
+                  fontFamily: "DM Sans, sans-serif",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+                value={sucursalSelec}
+                onChange={(e) => setSucursalSelec(parseInt(e.target.value))}
+              >
+                {Object.entries(SUCURSALES_NOMBRES).map(([id, nombre]) => (
+                  <option key={id} value={id}>
+                    {nombre}
+                  </option>
+                ))}
+              </select>
             </>
           )}
         </div>
@@ -381,7 +429,9 @@ export default function Reportes() {
             style={{
               borderRadius: "10px",
               border:
-                presetFecha === key ? "1.5px solid #1B3C53" : "1px solid #D2C1B6",
+                presetFecha === key
+                  ? "1.5px solid #1B3C53"
+                  : "1px solid #D2C1B6",
               background: presetFecha === key ? "#1B3C53" : "white",
               color: presetFecha === key ? "#F9F3EF" : "#456882",
               padding: "9px 12px",
@@ -503,7 +553,10 @@ export default function Reportes() {
             </thead>
             <tbody>
               {ventasPorSucursal.map((s) => (
-                <tr key={s.sucursalId} style={{ borderTop: "1px solid #f0ebe5" }}>
+                <tr
+                  key={s.sucursalId}
+                  style={{ borderTop: "1px solid #f0ebe5" }}
+                >
                   <td style={td}>{s.nombre}</td>
                   <td style={td}>{s.numVentas}</td>
                   <td style={td}>{formatPeso(s.ticketPromedio)}</td>
@@ -699,14 +752,14 @@ export default function Reportes() {
           >
             {sucursalActual}
           </p>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart margin={{ top: 20, right: 10, bottom: 20, left: 10 }}>
               <Pie
                 data={metodosPago}
                 cx="50%"
-                cy="45%"
-                innerRadius={62}
-                outerRadius={92}
+                cy="50%"
+                innerRadius={58}
+                outerRadius={85}
                 dataKey="value"
                 paddingAngle={3}
               >
@@ -717,21 +770,15 @@ export default function Reportes() {
               <Legend
                 iconType="circle"
                 iconSize={8}
+                verticalAlign="bottom"
                 wrapperStyle={{
                   fontSize: "12px",
                   fontFamily: "DM Sans",
-                  paddingTop: "8px",
+                  paddingTop: "16px",
                 }}
               />
               <Tooltip
-                formatter={(v, n) => [v, n]}
-                contentStyle={{
-                  borderRadius: "10px",
-                  border: "none",
-                  background: "#1B3C53",
-                  color: "white",
-                  fontSize: "13px",
-                }}
+                content={<MetodoPagoTooltip total={totalMetodosPago} />}
               />
             </PieChart>
           </ResponsiveContainer>
