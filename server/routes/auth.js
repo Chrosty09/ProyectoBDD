@@ -6,6 +6,10 @@ const usuarioSchema = require('../models/Usuario');
 
 const router = express.Router();
 
+function getModel(conn, name, schema) {
+  return conn.models[name] || conn.model(name, schema);
+}
+
 // POST /api/auth/login
 // Body: { username, password, sucursalId }
 // sucursalId 0 = admin HQ, 1-10 = sucursal especifica
@@ -25,7 +29,7 @@ router.post('/login', async (req, res) => {
       conn = getConnBySucursal(parseInt(sucursalId));
     }
 
-    const Usuario = conn.model('Usuario', usuarioSchema);
+    const Usuario = getModel(conn, 'Usuario', usuarioSchema);
     const usuario = await Usuario.findOne({ username, activo: true });
 
     if (!usuario) {

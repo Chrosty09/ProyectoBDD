@@ -49,4 +49,21 @@ function getConnBySucursal(sucursalId) {
   return getConn(key);
 }
 
-module.exports = { connectAll, getConn, getConnBySucursal };
+function getConnectionStatus(key) {
+  const conn = connections[key];
+  return {
+    key,
+    configured: Boolean(clusterUris[key]),
+    connected: Boolean(conn && conn.readyState === 1),
+    readyState: conn ? conn.readyState : 0,
+  };
+}
+
+module.exports = {
+  connectAll,
+  getConn,
+  getConnBySucursal,
+  getConnectionStatus,
+  connections,
+  clusterUris,
+};
