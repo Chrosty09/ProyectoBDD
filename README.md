@@ -781,7 +781,7 @@ MongoDB Atlas IP bloqueada:
 15. Mostrar reporte actualizado.
 16. Explicar que la venta se guardó en cluster `s01`.
 
-## Qué Defender Frente al Profesor
+## Puntos Clave
 
 - La venta se fragmenta por `sucursalId`.
 - Inventario está fragmentado de forma derivada.
