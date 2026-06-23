@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+
+
 
 const SUCURSALES_NOMBRES = {
   1: "Aguascalientes Centro",
@@ -54,15 +56,18 @@ function formatPeso(value) {
 }
 
 function getProducto(item) {
-  return item.producto || {
-    sku: item.sku,
-    nombre: item.nombreProducto,
-    precio: 0,
-    categoria: "Sin categoria",
-  };
+  return (
+    item.producto || {
+      sku: item.sku,
+      nombre: item.nombreProducto,
+      precio: 0,
+      categoria: "Sin categoria",
+    }
+  );
 }
 
 export default function PuntoDeVenta() {
+  const inventarioRequestId = useRef(0);
   const { usuario } = useAuth();
   const [busqueda, setBusqueda] = useState("");
   const [inventario, setInventario] = useState([]);
@@ -93,32 +98,44 @@ export default function PuntoDeVenta() {
   }, [busqueda, puedeVender, sucursalId]);
 
   async function cargarInventario(q = "") {
+    const requestId = ++inventarioRequestId.current;
     setLoadingCatalogo(true);
+    setError("");
+
     try {
-      const params = new URLSearchParams({ limite: "12" });
+      const params = new URLSearchParams({ limite: "20" });
       if (q.trim()) params.set("q", q.trim());
+
       const res = await api.get(
         `/inventario/sucursal/${sucursalId}?${params.toString()}`,
       );
+
+      if (requestId !== inventarioRequestId.current) return;
       setInventario(res.data.inventario || []);
     } catch (err) {
+      if (requestId !== inventarioRequestId.current) return;
+      setInventario([]);
       setError(err.response?.data?.error || "Error al consultar inventario");
     } finally {
-      setLoadingCatalogo(false);
+      if (requestId === inventarioRequestId.current) {
+        setLoadingCatalogo(false);
+      }
     }
   }
 
   async function cargarHistorial() {
-    setLoadingHistorial(true);
-    try {
-      const res = await api.get(`/ventas/sucursal/${sucursalId}?limite=8`);
-      setHistorial(res.data.ventas || []);
-    } catch (err) {
-      setError(err.response?.data?.error || "Error al consultar historial");
-    } finally {
-      setLoadingHistorial(false);
-    }
+  setLoadingHistorial(true);
+  setError("");
+
+  try {
+    const res = await api.get(`/ventas/sucursal/${sucursalId}?limite=8`);
+    setHistorial(res.data.ventas || []);
+  } catch (err) {
+    setError(err.response?.data?.error || "Error al consultar historial");
+  } finally {
+    setLoadingHistorial(false);
   }
+}
 
   function agregarProducto(inventarioItem) {
     const producto = getProducto(inventarioItem);
@@ -274,7 +291,16 @@ export default function PuntoDeVenta() {
             />
           </div>
 
-          <div style={{ display: "grid", gap: "10px" }}>
+          <div
+            style={{
+              display: "grid",
+              gap: "10px",
+              maxHeight: "calc(100vh - 300px)",
+              overflowY: "auto",
+              paddingRight: "6px",
+              alignContent: "start",
+            }}
+          >
             {loadingCatalogo && (
               <p style={{ color: "#8a9eb0", fontSize: "14px" }}>
                 Consultando inventario...
@@ -471,7 +497,13 @@ export default function PuntoDeVenta() {
           </div>
 
           <p style={labelStyle}>Metodo de pago</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "8px",
+            }}
+          >
             {METODOS_PAGO.map((metodo) => (
               <button
                 key={metodo}
@@ -560,11 +592,14 @@ export default function PuntoDeVenta() {
               </thead>
               <tbody>
                 {historial.map((venta) => (
-                  <tr key={venta._id} style={{ borderTop: "1px solid #f0ebe5" }}>
+                  <tr
+                    key={venta._id}
+                    style={{ borderTop: "1px solid #f0ebe5" }}
+                  >
                     <td style={td}>
-                      {new Date(venta.timestamp || venta.createdAt).toLocaleString(
-                        "es-MX",
-                      )}
+                      {new Date(
+                        venta.timestamp || venta.createdAt,
+                      ).toLocaleString("es-MX")}
                     </td>
                     <td style={td}>{venta.cajeroNombre}</td>
                     <td style={td}>{venta.items?.length || 0}</td>
